@@ -2,6 +2,7 @@ import streamlit as st
 from google import genai
 from google.genai import types
 import json
+import urllib.parse
 
 st.set_page_config(page_title="모둠 융합 탐구 프로토콜", layout="wide")
 
@@ -18,7 +19,7 @@ if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 
 st.title("🔬 과학과제연구: 모둠 융합 탐구 및 자가진단 프로토콜")
-st.caption("Gemini 3.6이 융합 주제와 근거 논문(출처·DOI·선정이유)을 자동 제시하고, 학생 주도로 실험 타당성을 검증합니다.")
+st.caption("Gemini 3.6이 융합 주제와 검증 가능한 학술 근거를 제시하고, 학생 주도로 실험 타당성을 검증합니다.")
 
 # ==========================================
 # STEP 1: 개인 API 키 입력 + 모둠원 정보 입력
@@ -33,7 +34,7 @@ if st.session_state.step == 1:
             type="password",
             value=st.session_state.api_key,
             placeholder="AIzaSy...",
-            help="Google AI Studio(aistudio.google.com)에서 무료 발급받은 본인 키를 입력합니다."
+            help="Google AI Studio(aistudio.google.com)에서 발급받은 키를 입력합니다."
         )
         if user_key:
             st.session_state.api_key = user_key.strip()
@@ -49,33 +50,31 @@ if st.session_state.step == 1:
             name = st.text_input("이름/닉네임", value=f"학생 {chr(65+i)}", key=f"name_{i}")
             major = st.text_input("희망 진로/전공", placeholder="예: 인공지능, 환경공학, 생명과학", key=f"maj_{i}")
             keyword = st.text_input("관심분야", placeholder="예: 컴퓨터비전, 미세먼지, 기공개폐", key=f"key_{i}")
-            paper = st.text_area("사전 관심 메모 (선택)", placeholder="평소 관심 있던 현상이나 수업 때 배운 개념을 적어도 좋습니다.", key=f"paper_{i}")
+            paper = st.text_area("사전 관심 메모 (선택)", placeholder="평소 관심 있던 현상이나 수업 때 배운 개념을 적어주세요.", key=f"paper_{i}")
             current_team.append({"name": name, "major": major, "keyword": keyword, "paper": paper})
     
     st.divider()
-    if st.button("Gemini 3.6 정밀 탐구 및 근거 논문 생성 ➔", type="primary"):
+    if st.button("Gemini 3.6 정밀 탐구 및 근거 자료 생성 ➔", type="primary"):
         if not st.session_state.api_key:
             st.error("상단에 개인 Gemini API Key를 먼저 입력해 주세요!")
         elif all(member["name"].strip() and member["major"].strip() for member in current_team):
             st.session_state.team_info = current_team
             
-            with st.spinner("Gemini 3.6이 융합 실험 모델과 신뢰할 수 있는 학술 근거 자료를 수집·설계하고 있습니다..."):
+            with st.spinner("Gemini 3.6이 융합 실험 모델과 학술 자료를 분석 및 설계하고 있습니다..."):
                 try:
                     client = genai.Client(api_key=st.session_state.api_key)
                     
                     prompt = f"""
                     당신은 고등학교 2학년 '과학과제연구' 수석 지도교사이자 학술 연구 멘토입니다.
                     다음 학생들의 관심사를 바탕으로 고교 실험실 환경에서 100% 실행 가능한 '융합 실험 탐구 주제 2가지'를 설계하세요.
-                    특히, 학생들이 직접 신뢰할 수 있도록 '해당 탐구의 학술적 근거가 되는 대표 선행 연구 논문/출품작 2편'을 당신이 직접 발굴하여 제시해야 합니다.
+                    학생들이 신뢰할 수 있도록 해당 탐구의 이론적 근거가 되는 대표 선행 연구 논문/출품작 2편을 명시하세요.
 
                     [모둠원 정보]
                     {json.dumps(current_team, ensure_ascii=False, indent=2)}
 
-                    [작성 지침]
-                    1. reference_materials 배열 안에 각 주제의 이론적 토대가 되는 논문/연구보고서 2편의 구체적 서지정보(제목, 저자/기관, DOI 또는 학술DB 검색링크, 선정이유, 핵심 요약)를 완벽히 채워줄 것.
-                    2. 실험 프로토콜(protocol)은 고교 실험실과 일상 도구로 재현 가능한 4단계 절차로 상세히 작성할 것.
-                    3. 타당성 진단 가이드(diagnosis_guide)에는 학교 맞춤형 실현 방안을 구체적으로 명시할 것.
-                    4. 반드시 아래 JSON 형식으로만 응답할 것.
+                    [중요: 학술 자료 지침]
+                    - 절대로 임의의 가짜 DOI나 존재하지 않는 웹 링크 URL을 지어내지 마십시오.
+                    - 대신 실제 학술 DB(RISS, DBpia, Google Scholar)에서 즉시 검색되는 '정확한 연구 주제명/학술지명'과 '핵심 검색 키워드(search_keyword)'를 정확히 제공하십시오.
 
                     [JSON 응답 포맷]
                     {{
@@ -91,17 +90,17 @@ if st.session_state.step == 1:
                           "duration": "소요 기간 및 주간 세부 일정",
                           "reference_materials": [
                             {{
-                              "title": "근거 논문/자료 제목 (실제 학술지 또는 전람회 연구 수준)",
-                              "author_org": "저자 또는 발행 기관 (예: 한국환경생태학회, 국립산림과학원 등)",
-                              "link_doi": "DOI 또는 검색 링크 (예: https://doi.org/... 또는 DBpia/ScienceON 링크 안내)",
-                              "why_selected": "이 연구에 이 논문을 근거 자료로 선정한 이유 및 흥미롭게 볼 점",
-                              "summary": "논문의 핵심 내용 메모 및 고교 실험에서 착안할 점"
+                              "title": "선행 연구 논문/보고서 제목 (실제 학술지나 전람회 수준의 대표적 주제)",
+                              "author_org": "저자 또는 발행 학회/기관 (예: 한국환경생태학회, 국립산림과학원 등)",
+                              "search_keyword": "이 논문이나 유사 원문을 찾기 위한 핵심 검색어 2~3개",
+                              "why_selected": "이 연구의 근거로 선정한 구체적 이유",
+                              "summary": "논문의 핵심 내용 메모 및 고교 간이 실험 착안점"
                             }},
                             {{
-                              "title": "두 번째 근거 논문/자료 제목",
-                              "author_org": "저자 또는 발행 기관",
-                              "link_doi": "DOI 또는 검색 링크",
-                              "why_selected": "선정 이유 및 실험 연계점",
+                              "title": "두 번째 선행 연구 제목",
+                              "author_org": "저자 또는 발행 학회/기관",
+                              "search_keyword": "핵심 검색어",
+                              "why_selected": "선정 이유",
                               "summary": "핵심 요약 메모"
                             }}
                           ],
@@ -112,7 +111,7 @@ if st.session_state.step == 1:
                             {{"phase": "4단계: 데이터 정량화 및 영상/통계 분석", "detail": "상세 설명"}}
                           ],
                           "diagnosis_guide": {{
-                            "quantification": "종속변인을 숫자로 재는 구체적 도구/앱/공식",
+                            "quantification": "종속변인을 숫자로 재는 도구/앱/공식",
                             "time_management": "방과후 1~2시간 내 끝내는 시간 관리법",
                             "reproducibility": "오차를 줄이고 3~5회 재현성을 확보하는 요령",
                             "procurement": "주변(학교/다이소/인터넷)에서 재료를 1주일 내 구하는 경로",
@@ -144,7 +143,7 @@ if st.session_state.step == 1:
                     st.session_state.step = 2
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Gemini 연동 중 오류가 발생했습니다. 키가 올바른지 확인해 주세요: {e}")
+                    st.error(f"Gemini 연동 중 오류가 발생했습니다: {e}")
         else:
             st.warning("모든 학생의 이름과 희망 진로를 입력해 주세요.")
 
@@ -153,7 +152,7 @@ if st.session_state.step == 1:
 # ==========================================
 elif st.session_state.step == 2:
     st.header("Step 2. 다학제 융합 연구 가설 선택")
-    st.info("Gemini 3.6이 학술 논문과 실험 가능성을 종합 분석하여 2가지 최적 모델을 도출했습니다.")
+    st.info("Gemini 3.6이 학술 선행 연구와 실험 가능성을 종합 분석하여 2가지 최적 모델을 도출했습니다.")
     
     members_summary = " + ".join([f"**{m['name']}**({m['major']})" for m in st.session_state.team_info])
     st.markdown(f"**현재 모둠:** {members_summary}")
@@ -164,13 +163,12 @@ elif st.session_state.step == 2:
             st.write(f"**융합 원리:** {opt['desc']}")
             st.caption(f"**역할 분담:** {opt['roles']}")
             
-            # 추천 근거 논문 제목 힌트 미리보기
             refs = opt.get("reference_materials", [])
             if refs:
                 ref_titles = " / ".join([f"📄 {r.get('title')}" for r in refs])
                 st.caption(f"**기반 근거 논문:** {ref_titles}")
                 
-            if st.button("이 주제로 실험 프로토콜 및 근거 자료 확인", key=f"choose_{idx}", type="primary"):
+            if st.button("이 주제로 상세 실험 프로토콜 및 근거 자료 확인", key=f"choose_{idx}", type="primary"):
                 st.session_state.selected_topic = opt
                 st.session_state.step = 3
                 st.rerun()
@@ -181,7 +179,7 @@ elif st.session_state.step == 2:
         st.rerun()
 
 # ==========================================
-# STEP 3 & 4: 상세 실험 프로토콜, 타당성 진단, AI 제공 근거 논문
+# STEP 3 & 4: 상세 실험 프로토콜, 타당성 진단, 실제 학술 검색 링크
 # ==========================================
 elif st.session_state.step == 3:
     topic = st.session_state.selected_topic
@@ -195,14 +193,12 @@ elif st.session_state.step == 3:
     
     tab1, tab2, tab3, tab4 = st.tabs([
         "🔬 상세 실험 프로토콜",
-        "📚 AI 제공 근거 논문 및 고찰",
+        "📚 근거 논문 및 다이렉트 검색",
         "⚖️ 타당성 자가진단 및 솔루션",
         "⚠️ 오차 통제 & 계획서 정리"
     ])
     
-    # -------------------------------------------------------------
     # TAB 1: 단계별 실험 프로토콜
-    # -------------------------------------------------------------
     with tab1:
         st.subheader("📋 단계별 구체적 실험 절차")
         with st.container(border=True):
@@ -225,36 +221,48 @@ elif st.session_state.step == 3:
             with st.expander(f"📌 {p.get('phase', '실험 단계')}", expanded=True):
                 st.markdown(p.get("detail", "세부 내용이 없습니다."))
 
-    # -------------------------------------------------------------
-    # TAB 2: AI가 직접 찾아준 근거 자료 및 학생 메모
-    # -------------------------------------------------------------
+    # TAB 2: 가짜 DOI 대신 실제 작동하는 학술 검색 링크 제공
     with tab2:
-        st.subheader("📚 AI가 발굴한 이 연구의 학술 근거 논문")
-        st.caption("AI가 이 주제의 토대가 된 선행 연구를 분석하여 제시한 내용입니다. 확인 후 우리 모둠의 적용점을 적어보세요.")
+        st.subheader("📚 이 연구의 학술 근거 논문 및 원문 탐색")
+        st.caption("AI가 가설 수립에 참고한 학술 자료입니다. 링크를 클릭하면 실제 학술 검색 결과로 즉시 연결됩니다.")
         
         student_notes = []
         for i, ref in enumerate(refs):
+            title = ref.get('title', '제목 없음')
+            author_org = ref.get('author_org', '기관 미상')
+            search_term = ref.get('search_keyword', title)
+            
+            # 실제 작동하는 안전한 학술 DB 검색 URL 생성
+            scholar_url = f"https://scholar.google.com/scholar?q={urllib.parse.quote(title)}"
+            dbpia_url = f"https://www.dbpia.co.kr/search/topSearch?searchQuery={urllib.parse.quote(search_term)}"
+            
             with st.container(border=True):
-                st.markdown(f"### 📄 근거 논문 {i+1}: {ref.get('title', '제목 없음')}")
-                st.markdown(f"**🏛️ 저자 / 발행 기관:** `{ref.get('author_org', '기관 미상')}`")
-                st.markdown(f"**🔗 출처 링크 · DOI:** `{ref.get('link_doi', '링크 없음')}`")
+                st.markdown(f"### 📄 근거 논문 {i+1}: {title}")
+                st.markdown(f"**🏛️ 저자 / 발행 학회:** `{author_org}`")
+                
+                # 오류 없는 실제 다이렉트 검색 버튼 2종
+                b_col1, b_col2 = st.columns(2)
+                with b_col1:
+                    st.link_button("🌐 Google Scholar에서 원문 검색", scholar_url, use_container_width=True)
+                with b_col2:
+                    st.link_button("📑 DBpia에서 관련 연구 검색", dbpia_url, use_container_width=True)
+                
+                st.write("")
                 st.markdown(f"**💡 이 자료를 근거로 선정한 이유:**\n> {ref.get('why_selected', '-')}")
-                st.markdown(f"**📝 논문 핵심 요약:**\n{ref.get('summary', '-')}")
+                st.markdown(f"**📝 논문 핵심 요약 및 실험 착안점:**\n{ref.get('summary', '-')}")
                 
                 note = st.text_input(
-                    f"👉 [모둠 토의] 우리 실험에 이 논문을 어떻게 반영/응용할 것인가요?",
+                    f"👉 [모둠 토의] 우리 실험에 이 논문의 어떤 점을 반영할까요?",
                     key=f"note_{i}",
-                    placeholder="예: 논문에 나온 에탄올 농도 조건을 우리 간이 실험에 그대로 적용하기로 함."
+                    placeholder="예: 논문에 제시된 농도 조건과 이미지 처리 기법을 참고하기로 함."
                 )
-                student_notes.append({"ref": ref, "student_note": note})
+                student_notes.append({"ref": ref, "student_note": note, "scholar_url": scholar_url})
                 
         st.markdown("---")
-        st.markdown("**🔍 추가 조사를 위한 학술 DB 검색식:**")
+        st.markdown("**🔍 추가 탐색을 위한 통합 불리언 검색식:**")
         st.code(topic.get('search_query', ''), language="text")
 
-    # -------------------------------------------------------------
-    # TAB 3: 타당성 자가진단 및 솔루션
-    # -------------------------------------------------------------
+    # TAB 3: 타당성 자가진단
     with tab3:
         st.subheader("⚖️ 모둠 주도 타당성 자가진단 및 해결 가이드")
         col_check, col_sol = st.columns([1, 1])
@@ -290,9 +298,7 @@ elif st.session_state.step == 3:
                 if score < 4:
                     st.info(f"🛠️ **스케일다운 대안:** {diag.get('scale_down_hint', '-')}")
 
-    # -------------------------------------------------------------
-    # TAB 4: 오차 예방 및 완성형 연구 계획서
-    # -------------------------------------------------------------
+    # TAB 4: 계획서 정리
     with tab4:
         st.subheader("⚠️ 오차 통제 & 최종 연구 계획서 자동 생성")
         st.markdown(f"**주요 오차 요인 및 극복 팁:**\n{topic.get('pitfalls_and_tips', '-')}")
@@ -300,16 +306,15 @@ elif st.session_state.step == 3:
         st.divider()
         st.subheader("📑 연구 계획서 제출용 종합본")
         
-        # 근거 논문 및 학생 적용점 텍스트 블록
         ref_text_block = ""
         for idx, item in enumerate(student_notes):
             r = item["ref"]
             ref_text_block += f"""
 [{idx+1}] {r.get('title')} ({r.get('author_org')})
-  - 출처/DOI: {r.get('link_doi')}
+  - 검색 출처: {item['scholar_url']}
   - 근거 선정 이유: {r.get('why_selected')}
   - 논문 핵심 요약: {r.get('summary')}
-  - 모둠 적용 아이디어: {item['student_note'] or '선행 논문의 기본 실험 조건을 벤치마킹함'}"""
+  - 모둠 적용 아이디어: {item['student_note'] or '선행 논문의 기본 조건을 벤치마킹함'}"""
 
         full_plan_text = f"""[과학과제연구 계획서]
 
