@@ -18,7 +18,7 @@ if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 
 st.title("🔬 과학과제연구: 모둠 융합 탐구 및 자가진단 프로토콜")
-st.caption("Google Gemini 3.6 기반 실시간 다학제 융합, 상세 실험 프로토콜 및 타당성 진단 시스템")
+st.caption("Gemini 3.6이 융합 주제와 근거 논문(출처·DOI·선정이유)을 자동 제시하고, 학생 주도로 실험 타당성을 검증합니다.")
 
 # ==========================================
 # STEP 1: 개인 API 키 입력 + 모둠원 정보 입력
@@ -39,7 +39,6 @@ if st.session_state.step == 1:
             st.session_state.api_key = user_key.strip()
     
     st.write("")
-    
     team_size = st.radio("모둠 참여 인원을 선택하세요", [2, 3], horizontal=True)
     
     cols = st.columns(team_size)
@@ -50,31 +49,32 @@ if st.session_state.step == 1:
             name = st.text_input("이름/닉네임", value=f"학생 {chr(65+i)}", key=f"name_{i}")
             major = st.text_input("희망 진로/전공", placeholder="예: 인공지능, 환경공학, 생명과학", key=f"maj_{i}")
             keyword = st.text_input("관심분야", placeholder="예: 컴퓨터비전, 미세먼지, 기공개폐", key=f"key_{i}")
-            paper = st.text_area("연구논문/자료 요약", placeholder="논문이나 핵심 실험 내용을 2~3줄로 적어주세요.", key=f"paper_{i}")
+            paper = st.text_area("사전 관심 메모 (선택)", placeholder="평소 관심 있던 현상이나 수업 때 배운 개념을 적어도 좋습니다.", key=f"paper_{i}")
             current_team.append({"name": name, "major": major, "keyword": keyword, "paper": paper})
     
     st.divider()
-    if st.button("Gemini 3.6 정밀 융합 탐구 설계하기 ➔", type="primary"):
+    if st.button("Gemini 3.6 정밀 탐구 및 근거 논문 생성 ➔", type="primary"):
         if not st.session_state.api_key:
             st.error("상단에 개인 Gemini API Key를 먼저 입력해 주세요!")
         elif all(member["name"].strip() and member["major"].strip() for member in current_team):
             st.session_state.team_info = current_team
             
-            with st.spinner("Gemini 3.6이 상세 실험 절차와 타당성 진단 솔루션을 심층 설계하고 있습니다..."):
+            with st.spinner("Gemini 3.6이 융합 실험 모델과 신뢰할 수 있는 학술 근거 자료를 수집·설계하고 있습니다..."):
                 try:
                     client = genai.Client(api_key=st.session_state.api_key)
                     
                     prompt = f"""
-                    당신은 고등학교 2학년 '과학과제연구' 전문 수석 지도교사입니다.
-                    다음 학생들의 관심사와 사전 조사 내용을 바탕으로, 모둠원 전원이 명확한 역할을 분담하고 일반 고교 과학실 및 일상 도구로 100% 실행 가능한 '구체적 실험 탐구 모델 2가지'를 제안하세요.
+                    당신은 고등학교 2학년 '과학과제연구' 수석 지도교사이자 학술 연구 멘토입니다.
+                    다음 학생들의 관심사를 바탕으로 고교 실험실 환경에서 100% 실행 가능한 '융합 실험 탐구 주제 2가지'를 설계하세요.
+                    특히, 학생들이 직접 신뢰할 수 있도록 '해당 탐구의 학술적 근거가 되는 대표 선행 연구 논문/출품작 2편'을 당신이 직접 발굴하여 제시해야 합니다.
 
                     [모둠원 정보]
                     {json.dumps(current_team, ensure_ascii=False, indent=2)}
 
-                    [작성 원칙 - 매우 구체적이어야 함]
-                    1. 단순 개요가 아닌, 학생들이 보고 그대로 따라 할 수 있는 상세 실험 절차(Step 1~4)를 작성할 것.
-                    2. 타당성 진단 가이드(diagnosis_guide)에는 이 특정 주제에 맞춰 재료를 어디서 사는지, 수치는 어떤 무료 앱/장비로 재는지, 주말 방치 없이 어떻게 관리하는지 구체적 솔루션을 줄 것.
-                    3. 학생들이 실패하기 쉬운 오차 원인과 통제 팁을 명시할 것.
+                    [작성 지침]
+                    1. reference_materials 배열 안에 각 주제의 이론적 토대가 되는 논문/연구보고서 2편의 구체적 서지정보(제목, 저자/기관, DOI 또는 학술DB 검색링크, 선정이유, 핵심 요약)를 완벽히 채워줄 것.
+                    2. 실험 프로토콜(protocol)은 고교 실험실과 일상 도구로 재현 가능한 4단계 절차로 상세히 작성할 것.
+                    3. 타당성 진단 가이드(diagnosis_guide)에는 학교 맞춤형 실현 방안을 구체적으로 명시할 것.
                     4. 반드시 아래 JSON 형식으로만 응답할 것.
 
                     [JSON 응답 포맷]
@@ -82,40 +82,44 @@ if st.session_state.step == 1:
                       "topics": [
                         {{
                           "title": "가설 중심의 구체적인 연구 제목",
-                          "desc": "융합 구조 및 핵심 과학적 원리 설명 (2~3줄)",
-                          "roles": "학생별 구체적 역할 분담 (누가 시료를 준비하고, 측정하고, 코딩/분석하는지)",
-                          "independent_var": "독립변인 (우리가 조작할 구체적 조건 및 단계)",
+                          "desc": "융합 원리 및 핵심 과학적 메커니즘 (2~3줄)",
+                          "roles": "학생별 구체적 역할 분담",
+                          "independent_var": "독립변인 (조작 조건)",
                           "dependent_var": "종속변인 (숫자로 측정할 물리량 및 단위)",
-                          "controlled_var": "통제변인 (일정하게 유지해야 하는 핵심 조건들)",
-                          "tools": "필요 장비 및 재료 목록 (학교 비치품 + 일상 대체품)",
-                          "duration": "총 소요 기간 및 주간 세부 시간표",
-                          "protocol": [
+                          "controlled_var": "통제변인 (일정하게 유지할 조건)",
+                          "tools": "준비 장비 및 재료 목록",
+                          "duration": "소요 기간 및 주간 세부 일정",
+                          "reference_materials": [
                             {{
-                              "phase": "1단계: 시료 준비 및 간이 실험 장치 제작",
-                              "detail": "시료를 어떻게 규격화하고 간이 챔버/장치를 어떻게 조립하는지 구체적 설명"
+                              "title": "근거 논문/자료 제목 (실제 학술지 또는 전람회 연구 수준)",
+                              "author_org": "저자 또는 발행 기관 (예: 한국환경생태학회, 국립산림과학원 등)",
+                              "link_doi": "DOI 또는 검색 링크 (예: https://doi.org/... 또는 DBpia/ScienceON 링크 안내)",
+                              "why_selected": "이 연구에 이 논문을 근거 자료로 선정한 이유 및 흥미롭게 볼 점",
+                              "summary": "논문의 핵심 내용 메모 및 고교 실험에서 착안할 점"
                             }},
                             {{
-                              "phase": "2단계: 예비 실험 및 측정 기준선(캘리브레이션) 설정",
-                              "detail": "본실험 전 센서 영점 조절, 조명/배경 통제 세팅 방법"
-                            }},
-                            {{
-                              "phase": "3단계: 본실험 수행 및 변인별 반복 측정",
-                              "detail": "독립변인 조건별 시료 투입, 측정 주기, 최소 반복 횟수(3~5회) 절차"
-                            }},
-                            {{
-                              "phase": "4단계: 데이터 추출 및 통계/영상 분석",
-                              "detail": "측정 데이터 정리법, 무료 소프트웨어(ImageJ/파이썬/엑셀) 활용 분석 절차"
+                              "title": "두 번째 근거 논문/자료 제목",
+                              "author_org": "저자 또는 발행 기관",
+                              "link_doi": "DOI 또는 검색 링크",
+                              "why_selected": "선정 이유 및 실험 연계점",
+                              "summary": "핵심 요약 메모"
                             }}
                           ],
+                          "protocol": [
+                            {{"phase": "1단계: 시료 준비 및 간이 장치 제작", "detail": "상세 설명"}},
+                            {{"phase": "2단계: 예비 측정 및 캘리브레이션", "detail": "상세 설명"}},
+                            {{"phase": "3단계: 본실험 수행 및 변인별 반복 측정", "detail": "상세 설명"}},
+                            {{"phase": "4단계: 데이터 정량화 및 영상/통계 분석", "detail": "상세 설명"}}
+                          ],
                           "diagnosis_guide": {{
-                            "quantification": "종속변인을 숫자로 정량 측정하는 구체적 방법 (추천 무료 앱, 센서, 공식)",
-                            "time_management": "수업 및 방과후(1~2시간) 내에 완료할 수 있는 시간 관리 요령 (야간/주말 관리 배제법)",
-                            "reproducibility": "최소 3~5회 반복 실험 시 동일한 결과를 얻기 위한 통제 요령",
-                            "procurement": "필요 재료를 주변(학교 과학실, 다이소, 문구점, 인터넷 쇼핑)에서 1주일 내 안전하게 구하는 방법",
-                            "scale_down_hint": "장비나 시약 조달에 문제가 생겼을 때 즉시 다운사이징할 수 있는 대체 실험법"
+                            "quantification": "종속변인을 숫자로 재는 구체적 도구/앱/공식",
+                            "time_management": "방과후 1~2시간 내 끝내는 시간 관리법",
+                            "reproducibility": "오차를 줄이고 3~5회 재현성을 확보하는 요령",
+                            "procurement": "주변(학교/다이소/인터넷)에서 재료를 1주일 내 구하는 경로",
+                            "scale_down_hint": "장비 부족 시 즉시 다운사이징할 수 있는 대체 실험법"
                           }},
-                          "pitfalls_and_tips": "이 실험에서 가장 발생하기 쉬운 오차 원인 및 이를 극복하는 핵심 노하우",
-                          "search_query": "DBpia/ScienceON/RISS 검색용 불리언 검색식"
+                          "pitfalls_and_tips": "가장 흔한 오차 요인과 극복 팁",
+                          "search_query": "DBpia/RISS 검색용 불리언 검색식"
                         }}
                       ]
                     }}
@@ -149,7 +153,7 @@ if st.session_state.step == 1:
 # ==========================================
 elif st.session_state.step == 2:
     st.header("Step 2. 다학제 융합 연구 가설 선택")
-    st.info("입력된 관심사를 Gemini 3.6이 분석하여 모둠원 전원이 참여할 수 있는 융합 모델을 도출했습니다.")
+    st.info("Gemini 3.6이 학술 논문과 실험 가능성을 종합 분석하여 2가지 최적 모델을 도출했습니다.")
     
     members_summary = " + ".join([f"**{m['name']}**({m['major']})" for m in st.session_state.team_info])
     st.markdown(f"**현재 모둠:** {members_summary}")
@@ -159,7 +163,14 @@ elif st.session_state.step == 2:
             st.subheader(opt['title'])
             st.write(f"**융합 원리:** {opt['desc']}")
             st.caption(f"**역할 분담:** {opt['roles']}")
-            if st.button("이 주제로 상세 실험 프로토콜 및 진단 열기", key=f"choose_{idx}", type="primary"):
+            
+            # 추천 근거 논문 제목 힌트 미리보기
+            refs = opt.get("reference_materials", [])
+            if refs:
+                ref_titles = " / ".join([f"📄 {r.get('title')}" for r in refs])
+                st.caption(f"**기반 근거 논문:** {ref_titles}")
+                
+            if st.button("이 주제로 실험 프로토콜 및 근거 자료 확인", key=f"choose_{idx}", type="primary"):
                 st.session_state.selected_topic = opt
                 st.session_state.step = 3
                 st.rerun()
@@ -170,33 +181,30 @@ elif st.session_state.step == 2:
         st.rerun()
 
 # ==========================================
-# STEP 3 & 4: 상세 실험 프로토콜 및 심층 타당성 진단
+# STEP 3 & 4: 상세 실험 프로토콜, 타당성 진단, AI 제공 근거 논문
 # ==========================================
 elif st.session_state.step == 3:
     topic = st.session_state.selected_topic
     diag = topic.get("diagnosis_guide", {})
     protocols = topic.get("protocol", [])
+    refs = topic.get("reference_materials", [])
     
     st.success(f"🎯 **선택한 연구 주제:** {topic['title']}")
     st.write(f"**연구 개요:** {topic.get('desc', '')}")
     st.info(f"👥 **모둠 역할 분담:** {topic.get('roles', '')}")
     
-    # 4개의 탭으로 구성하여 깊이 있는 정보를 제공
     tab1, tab2, tab3, tab4 = st.tabs([
-        "🔬 상세 실험 프로토콜 (단계별 가이드)",
-        "⚖️ 타당성 자가진단 및 맞춤 솔루션",
-        "⚠️ 오차 통제 & 실패 예방 팁",
-        "🔍 선행 연구 탐색 & 계획서 정리"
+        "🔬 상세 실험 프로토콜",
+        "📚 AI 제공 근거 논문 및 고찰",
+        "⚖️ 타당성 자가진단 및 솔루션",
+        "⚠️ 오차 통제 & 계획서 정리"
     ])
     
     # -------------------------------------------------------------
     # TAB 1: 단계별 실험 프로토콜
     # -------------------------------------------------------------
     with tab1:
-        st.subheader("📋 단계별 구체적 실험 절차 (Step-by-Step Protocol)")
-        st.caption("학생들이 과학실에서 바로 실행할 수 있는 실천 지침입니다.")
-        
-        # 기본 변인 요약 카드
+        st.subheader("📋 단계별 구체적 실험 절차")
         with st.container(border=True):
             v_col1, v_col2, v_col3 = st.columns(3)
             with v_col1:
@@ -209,30 +217,54 @@ elif st.session_state.step == 3:
                 st.markdown("**🔒 핵심 통제변인**")
                 st.write(topic.get("controlled_var", "-"))
                 
-        st.markdown(f"**🧰 준비 장비 및 재료:** {topic.get('tools', '-')}")
-        st.markdown(f"**⏱️ 권장 소요 기간 및 일정:** {topic.get('duration', '-')}")
+        st.markdown(f"**🧰 필요 장비 및 재료:** {topic.get('tools', '-')}")
+        st.markdown(f"**⏱️ 예상 소요 기간:** {topic.get('duration', '-')}")
         st.write("")
         
-        # 4단계 세부 프로토콜
         for p in protocols:
             with st.expander(f"📌 {p.get('phase', '실험 단계')}", expanded=True):
                 st.markdown(p.get("detail", "세부 내용이 없습니다."))
-                
+
     # -------------------------------------------------------------
-    # TAB 2: 타당성 자가진단 및 맞춤 솔루션
+    # TAB 2: AI가 직접 찾아준 근거 자료 및 학생 메모
     # -------------------------------------------------------------
     with tab2:
-        st.subheader("⚖️ 모둠 주도 타당성 자가진단 및 해결 가이드")
-        st.write("각 항목을 체크하면서, AI가 제공한 **이 주제 맞춤형 솔루션**을 확인하고 토의하세요.")
+        st.subheader("📚 AI가 발굴한 이 연구의 학술 근거 논문")
+        st.caption("AI가 이 주제의 토대가 된 선행 연구를 분석하여 제시한 내용입니다. 확인 후 우리 모둠의 적용점을 적어보세요.")
         
+        student_notes = []
+        for i, ref in enumerate(refs):
+            with st.container(border=True):
+                st.markdown(f"### 📄 근거 논문 {i+1}: {ref.get('title', '제목 없음')}")
+                st.markdown(f"**🏛️ 저자 / 발행 기관:** `{ref.get('author_org', '기관 미상')}`")
+                st.markdown(f"**🔗 출처 링크 · DOI:** `{ref.get('link_doi', '링크 없음')}`")
+                st.markdown(f"**💡 이 자료를 근거로 선정한 이유:**\n> {ref.get('why_selected', '-')}")
+                st.markdown(f"**📝 논문 핵심 요약:**\n{ref.get('summary', '-')}")
+                
+                note = st.text_input(
+                    f"👉 [모둠 토의] 우리 실험에 이 논문을 어떻게 반영/응용할 것인가요?",
+                    key=f"note_{i}",
+                    placeholder="예: 논문에 나온 에탄올 농도 조건을 우리 간이 실험에 그대로 적용하기로 함."
+                )
+                student_notes.append({"ref": ref, "student_note": note})
+                
+        st.markdown("---")
+        st.markdown("**🔍 추가 조사를 위한 학술 DB 검색식:**")
+        st.code(topic.get('search_query', ''), language="text")
+
+    # -------------------------------------------------------------
+    # TAB 3: 타당성 자가진단 및 솔루션
+    # -------------------------------------------------------------
+    with tab3:
+        st.subheader("⚖️ 모둠 주도 타당성 자가진단 및 해결 가이드")
         col_check, col_sol = st.columns([1, 1])
         
         with col_check:
             st.markdown("#### 📝 학생 자가진단 체크리스트")
-            q1 = st.checkbox("1. 종속변인을 눈대중이 아닌 숫자로 측정 가능한가?", value=True)
-            q2 = st.checkbox("2. 주말/24시간 방치 없이 방과후 시간 내 관리가 가능한가?", value=True)
-            q3 = st.checkbox("3. 실패에 대비해 최소 3~5회 반복 측정이 가능한가?", value=True)
-            q4 = st.checkbox("4. 필요한 재료를 1주일 내 안전하게 조달할 수 있는가?", value=False)
+            q1 = st.checkbox("1. 종속변인을 숫자로 측정 가능한가?", value=True)
+            q2 = st.checkbox("2. 주말 방치 없이 방과후 시간 내 관리가 가능한가?", value=True)
+            q3 = st.checkbox("3. 3~5회 이상 반복 측정이 가능한가?", value=True)
+            q4 = st.checkbox("4. 재료를 1주일 내 안전하게 조달할 수 있는가?", value=False)
             
             score = sum([q1, q2, q3, q4])
             st.divider()
@@ -240,95 +272,46 @@ elif st.session_state.step == 3:
             if score == 4:
                 st.success("🟢 **Green Light (탐구 즉시 착수 권장)**\n학교 환경에서 완벽히 실행 가능합니다!")
             elif score == 3:
-                st.warning("🟡 **Yellow Light (스케일다운 필요)**\n체크되지 않은 항목의 맞춤 솔루션을 참고하여 조정하세요.")
+                st.warning("🟡 **Yellow Light (스케일다운 필요)**\n오른쪽 맞춤 솔루션을 참고하여 간소화하세요.")
             else:
-                st.error("🔴 **Red Light (설계 재검토 권장)**\n제약 사항이 많습니다. 아래 대체 실험법을 검토하거나 가설을 수정하세요.")
+                st.error("🔴 **Red Light (설계 재검토 권장)**\n가설을 수정하거나 대체 실험법을 검토하세요.")
                 
         with col_sol:
             st.markdown("#### 💡 이 실험 맞춤형 진단 해설")
             with st.container(border=True):
                 st.markdown("**1. 정량적 측정 솔루션:**")
-                st.caption(diag.get("quantification", "센서 및 앱을 활용해 수치화합니다."))
-                
+                st.caption(diag.get("quantification", "-"))
                 st.markdown("**2. 방과후 시간 관리 팁:**")
-                st.caption(diag.get("time_management", "방과후 1~2시간 내로 측정이 완료되는 구조입니다."))
-                
+                st.caption(diag.get("time_management", "-"))
                 st.markdown("**3. 반복 측정 및 재현성 요령:**")
-                st.caption(diag.get("reproducibility", "시료를 3개 이상 동시 배치하여 표준편차를 구합니다."))
-                
+                st.caption(diag.get("reproducibility", "-"))
                 st.markdown("**4. 현실적 재료 조달 경로:**")
-                st.caption(diag.get("procurement", "학교 과학실과 생활용품점에서 쉽게 조달 가능합니다."))
-                
+                st.caption(diag.get("procurement", "-"))
                 if score < 4:
-                    st.info(f"🛠️ **즉시 스케일다운 대안:** {diag.get('scale_down_hint', '간소화된 일상 대체재를 활용하세요.')}")
+                    st.info(f"🛠️ **스케일다운 대안:** {diag.get('scale_down_hint', '-')}")
 
     # -------------------------------------------------------------
-    # TAB 3: 오차 통제 및 실패 예방
-    # -------------------------------------------------------------
-    with tab3:
-        st.subheader("⚠️ 실험 실패 방지: 오차 요인 및 극복 노하우")
-        st.markdown(topic.get("pitfalls_and_tips", "오차를 줄이기 위해 암실 환경과 동일 시료군 통제가 필수적입니다."))
-        st.write("")
-        st.info("💡 **지도교사 Tip:** 과학과제연구 평가에서는 '가설이 맞았는가'보다 '오차 요인을 얼마나 과학적으로 분석하고 통제하려 노력했는가'가 훨씬 높은 점수를 받습니다.")
-
-# -------------------------------------------------------------
-    # TAB 4: 선행 연구 분석 노트 & 연구계획서 최종 취합
+    # TAB 4: 오차 예방 및 완성형 연구 계획서
     # -------------------------------------------------------------
     with tab4:
-        st.subheader("📚 모둠 선행 연구 분석 노트 (Literature Review)")
-        st.caption("선택한 주제와 관련된 논문이나 학술 자료를 찾고, 분석 내용을 모둠원별로 기록하세요.")
-        
-        # 검색 힌트
-        st.markdown("**🔍 추천 학술 DB 검색식 (DBpia / ScienceON / RISS):**")
-        st.code(topic.get('search_query', ''), language="text")
-        st.write("")
-        
-        # 모둠원별 논문 분석 카드 생성 (2~3명 자동 맞춤)
-        team_members = st.session_state.team_info
-        paper_records = []
-        
-        for idx, m in enumerate(team_members):
-            with st.container(border=True):
-                st.markdown(f"**📖 [{m['name']} / {m['major']}] 선행 연구 분석 카드**")
-                
-                col_p1, col_p2 = st.columns([2, 1])
-                with col_p1:
-                    p_title = st.text_input(f"관련 자료·논문 제목", key=f"p_title_{idx}", placeholder="예: 미세먼지 저감을 위한 수종별 엽면 미세구조 분석")
-                with col_p2:
-                    p_author = st.text_input(f"저자 또는 발행 기관", key=f"p_author_{idx}", placeholder="예: 한국환경생태학회 / 김철수 외")
-                
-                col_p3, col_p4 = st.columns([1, 1])
-                with col_p3:
-                    p_link = st.text_input(f"출처 링크 · DOI", key=f"p_link_{idx}", placeholder="예: https://doi.org/10.xxxx 또는 DBpia 링크")
-                with col_p4:
-                    p_reason = st.text_input(f"자료를 선택한 이유 / 흥미롭게 본 점", key=f"p_reason_{idx}", placeholder="예: 전자현미경 사진 대신 간이 광학 측정법을 힌트로 얻음")
-                
-                p_memo = st.text_area(f"간단한 내용 메모 및 우리 실험 적용점 (선택)", key=f"p_memo_{idx}", placeholder="논문의 핵심 결론이나 우리 모둠 실험 설계에 참고할 변인 통제 팁을 적으세요.", height=80)
-                
-                paper_records.append({
-                    "student": m['name'],
-                    "title": p_title,
-                    "author": p_author,
-                    "link": p_link,
-                    "reason": p_reason,
-                    "memo": p_memo
-                })
+        st.subheader("⚠️ 오차 통제 & 최종 연구 계획서 자동 생성")
+        st.markdown(f"**주요 오차 요인 및 극복 팁:**\n{topic.get('pitfalls_and_tips', '-')}")
         
         st.divider()
-        st.subheader("📑 연구 계획서 제출용 종합 요약본")
-        st.caption("위에서 입력한 선행 연구 분석 내용과 실험 프로토콜이 모두 통합된 완성형 계획서입니다.")
+        st.subheader("📑 연구 계획서 제출용 종합본")
         
-        # 선행 연구 텍스트 블록 조합
-        paper_text_block = ""
-        for r in paper_records:
-            paper_text_block += f"""
-- [{r['student']}] {r['title'] or '(논문제목 미입력)'} ({r['author'] or '저자 미입력'})
-  * 출처/DOI: {r['link'] or '링크 미입력'}
-  * 선정 이유: {r['reason'] or '선정 이유 미입력'}
-  * 핵심 메모: {r['memo'] or '메모 없음'}"""
+        # 근거 논문 및 학생 적용점 텍스트 블록
+        ref_text_block = ""
+        for idx, item in enumerate(student_notes):
+            r = item["ref"]
+            ref_text_block += f"""
+[{idx+1}] {r.get('title')} ({r.get('author_org')})
+  - 출처/DOI: {r.get('link_doi')}
+  - 근거 선정 이유: {r.get('why_selected')}
+  - 논문 핵심 요약: {r.get('summary')}
+  - 모둠 적용 아이디어: {item['student_note'] or '선행 논문의 기본 실험 조건을 벤치마킹함'}"""
 
-        # 최종 연구 계획서 텍스트
-        full_plan_text = f"""[연구 과제 계획서]
+        full_plan_text = f"""[과학과제연구 계획서]
 
 1. 연구 제목: {topic['title']}
 2. 연구 목적 및 가설: {topic.get('desc', '')}
@@ -341,7 +324,7 @@ elif st.session_state.step == 3:
 - 사용 장비 및 재료: {topic.get('tools', '')}
 - 총 소요 기간: {topic.get('duration', '')}
 
-5. 선행 연구 분석 (모둠원별 고찰):{paper_text_block}
+5. 학술적 근거 자료 및 선행 연구 분석:{ref_text_block}
 
 6. 상세 실험 프로토콜
 - 1단계: {protocols[0]['detail'] if len(protocols)>0 else ''}
@@ -352,7 +335,7 @@ elif st.session_state.step == 3:
 7. 오차 요인 및 극복 방안:
 {topic.get('pitfalls_and_tips', '')}
 """
-        st.text_area("활동지나 연구계획서에 그대로 복사해 붙여넣으세요:", value=full_plan_text, height=350)
+        st.text_area("활동지나 연구 계획서에 복사하여 제출하세요:", value=full_plan_text, height=350)
 
     st.divider()
     if st.button("⬅ 다른 주제 선택하기"):
