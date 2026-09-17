@@ -271,31 +271,88 @@ elif st.session_state.step == 3:
         st.write("")
         st.info("💡 **지도교사 Tip:** 과학과제연구 평가에서는 '가설이 맞았는가'보다 '오차 요인을 얼마나 과학적으로 분석하고 통제하려 노력했는가'가 훨씬 높은 점수를 받습니다.")
 
-    # -------------------------------------------------------------
-    # TAB 4: 선행 연구 및 정리
+# -------------------------------------------------------------
+    # TAB 4: 선행 연구 분석 노트 & 연구계획서 최종 취합
     # -------------------------------------------------------------
     with tab4:
-        st.subheader("🔍 선행 연구 탐색 & 계획서 작성 지원")
-        st.markdown("**학술 DB(DBpia / ScienceON / RISS) 검색용 불리언 검색식:**")
+        st.subheader("📚 모둠 선행 연구 분석 노트 (Literature Review)")
+        st.caption("선택한 주제와 관련된 논문이나 학술 자료를 찾고, 분석 내용을 모둠원별로 기록하세요.")
+        
+        # 검색 힌트
+        st.markdown("**🔍 추천 학술 DB 검색식 (DBpia / ScienceON / RISS):**")
         st.code(topic.get('search_query', ''), language="text")
+        st.write("")
+        
+        # 모둠원별 논문 분석 카드 생성 (2~3명 자동 맞춤)
+        team_members = st.session_state.team_info
+        paper_records = []
+        
+        for idx, m in enumerate(team_members):
+            with st.container(border=True):
+                st.markdown(f"**📖 [{m['name']} / {m['major']}] 선행 연구 분석 카드**")
+                
+                col_p1, col_p2 = st.columns([2, 1])
+                with col_p1:
+                    p_title = st.text_input(f"관련 자료·논문 제목", key=f"p_title_{idx}", placeholder="예: 미세먼지 저감을 위한 수종별 엽면 미세구조 분석")
+                with col_p2:
+                    p_author = st.text_input(f"저자 또는 발행 기관", key=f"p_author_{idx}", placeholder="예: 한국환경생태학회 / 김철수 외")
+                
+                col_p3, col_p4 = st.columns([1, 1])
+                with col_p3:
+                    p_link = st.text_input(f"출처 링크 · DOI", key=f"p_link_{idx}", placeholder="예: https://doi.org/10.xxxx 또는 DBpia 링크")
+                with col_p4:
+                    p_reason = st.text_input(f"자료를 선택한 이유 / 흥미롭게 본 점", key=f"p_reason_{idx}", placeholder="예: 전자현미경 사진 대신 간이 광학 측정법을 힌트로 얻음")
+                
+                p_memo = st.text_area(f"간단한 내용 메모 및 우리 실험 적용점 (선택)", key=f"p_memo_{idx}", placeholder="논문의 핵심 결론이나 우리 모둠 실험 설계에 참고할 변인 통제 팁을 적으세요.", height=80)
+                
+                paper_records.append({
+                    "student": m['name'],
+                    "title": p_title,
+                    "author": p_author,
+                    "link": p_link,
+                    "reason": p_reason,
+                    "memo": p_memo
+                })
         
         st.divider()
-        st.subheader("📑 연구 계획서 제출용 텍스트 요약")
-        plan_text = f"""[연구 제목] {topic['title']}
-[연구 목적] {topic.get('desc', '')}
-[모둠 역할] {topic.get('roles', '')}
-[변인 설정]
+        st.subheader("📑 연구 계획서 제출용 종합 요약본")
+        st.caption("위에서 입력한 선행 연구 분석 내용과 실험 프로토콜이 모두 통합된 완성형 계획서입니다.")
+        
+        # 선행 연구 텍스트 블록 조합
+        paper_text_block = ""
+        for r in paper_records:
+            paper_text_block += f"""
+- [{r['student']}] {r['title'] or '(논문제목 미입력)'} ({r['author'] or '저자 미입력'})
+  * 출처/DOI: {r['link'] or '링크 미입력'}
+  * 선정 이유: {r['reason'] or '선정 이유 미입력'}
+  * 핵심 메모: {r['memo'] or '메모 없음'}"""
+
+        # 최종 연구 계획서 텍스트
+        full_plan_text = f"""[연구 과제 계획서]
+
+1. 연구 제목: {topic['title']}
+2. 연구 목적 및 가설: {topic.get('desc', '')}
+3. 모둠원 및 역할 분담: {topic.get('roles', '')}
+
+4. 변인 설계
 - 독립변인: {topic.get('independent_var', '')}
 - 종속변인: {topic.get('dependent_var', '')}
 - 통제변인: {topic.get('controlled_var', '')}
-[실험 절차]
-1단계: {protocols[0]['detail'] if len(protocols)>0 else ''}
-2단계: {protocols[1]['detail'] if len(protocols)>1 else ''}
-3단계: {protocols[2]['detail'] if len(protocols)>2 else ''}
-4단계: {protocols[3]['detail'] if len(protocols)>3 else ''}
-[오차 통제 방안] {topic.get('pitfalls_and_tips', '')}
+- 사용 장비 및 재료: {topic.get('tools', '')}
+- 총 소요 기간: {topic.get('duration', '')}
+
+5. 선행 연구 분석 (모둠원별 고찰):{paper_text_block}
+
+6. 상세 실험 프로토콜
+- 1단계: {protocols[0]['detail'] if len(protocols)>0 else ''}
+- 2단계: {protocols[1]['detail'] if len(protocols)>1 else ''}
+- 3단계: {protocols[2]['detail'] if len(protocols)>2 else ''}
+- 4단계: {protocols[3]['detail'] if len(protocols)>3 else ''}
+
+7. 오차 요인 및 극복 방안:
+{topic.get('pitfalls_and_tips', '')}
 """
-        st.text_area("활동지나 연구계획서에 그대로 복사해 붙여넣으세요:", value=plan_text, height=220)
+        st.text_area("활동지나 연구계획서에 그대로 복사해 붙여넣으세요:", value=full_plan_text, height=350)
 
     st.divider()
     if st.button("⬅ 다른 주제 선택하기"):
